@@ -1,0 +1,66 @@
+pipeline {
+     agent {
+        label 'overseas_game'
+    }
+
+     parameters {
+        string(name: 'BRANCH', defaultValue: 'develop_4.41.0_config_build', trim: true, description: '构建配置的分支')
+        //string(name: 'SPREAD_SHEETS_ID', defaultValue: '1gmlqa8xNN5rc5Mf0nH0DCOVdRg4U96skB-_rJW40Jz4', trim: true, description: '谷歌表格的ID，非特殊请求不要改动这个ID')
+    }
+
+    stages {
+        stage('checkout') {
+            steps {
+                script {
+                    echo  "BRANCH: $params.BRANCH"
+                    dir('specific_directory') {
+                        bat """
+                            git reset --hard HEAD
+                            git pull
+                            git checkout --theirs .
+                            git add .
+                        """
+                        checkout([$class: 'GitSCM', 
+                          branches: [[name: params.BRANCH]], 
+                          doGenerateSubmoduleConfigurations: false, 
+                          extensions: [[$class: 'SparseCheckoutPaths', sparseCheckoutPaths: [[path: 'assets/']]]], 
+                          submoduleCfg: [], 
+                          userRemoteConfigs: [[url: 'git@gitlab.rlonlbns.link:tp_games/cocos_creator/teenpatti_games_new.git']]])
+
+                        bat "git checkout $params.BRANCH"
+                        bat "git pull"
+                    }
+
+                }
+            }
+        }
+
+        stage('build config') {
+            steps {
+
+                script {
+                    def workspaceDir = env.WORKSPACE
+                    def spreadSheetsId = '1gmlqa8xNN5rc5Mf0nH0DCOVdRg4U96skB-_rJW40Jz4'//params.SPREAD_SHEETS_ID
+                    bat "node ${workspaceDir}/languageTool.js ${workspaceDir} ${spreadSheetsId}"
+                }
+            }
+        }
+
+
+         stage('upload config') {
+            steps {
+                dir('specific_directory') {
+                    bat """
+                        git branch
+                        git add assets
+                        git commit -m "upload config"
+                        git pull
+                        git push --set-upstream origin $params.BRANCH
+                    """
+                }
+                
+            }
+        }
+      
+    }
+}
